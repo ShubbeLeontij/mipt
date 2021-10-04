@@ -71,12 +71,25 @@ rect(screen, (00, 66, 80), (0, 552, width, height - 552))
 
 # drawing objects
 draw_gull(screen, WHITE, 400, 800, 160)
+draw_gull(screen, WHITE, 600, 600, 100)
+draw_gull(screen, WHITE, 200, 650, 60)
 
 draw_fish(screen, LIGHT_BLUE, 600, 950, 80)
+draw_fish(screen, LIGHT_BLUE, 100, 900, 100)
+draw_fish(screen, LIGHT_BLUE, 500, 700, 50)
 
 draw_bird(screen, WHITE, 100, 100, 150)
 draw_bird(screen, WHITE, 150, 400, 150)
 draw_bird(screen, WHITE, 500, 200, 150)
+draw_bird(screen, WHITE, 600, 300, 100)
+draw_bird(screen, WHITE, 550, 400, 100)
+draw_bird(screen, WHITE, 700, 250, 100)
+draw_bird(screen, WHITE, 200, 200, 50)
+draw_bird(screen, WHITE, 250, 300, 50)
+draw_bird(screen, WHITE, 300, 350, 50)
+draw_bird(screen, WHITE, 200, 350, 50)
+draw_bird(screen, WHITE, 350, 250, 50)
+draw_bird(screen, WHITE, 300, 200, 50)
 
 
 pygame.display.update()
