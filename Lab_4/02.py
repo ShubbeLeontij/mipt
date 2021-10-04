@@ -10,7 +10,7 @@ def draw_fish(screen, color, x, y, size):
     pass
 
 def draw_gull(screen, color, x, y, size):
-    ellipse(screen, color, (x, y, size, size / 2))
+    ellipse(screen, color, (x, y, size, size / 2)) # test
     ellipse(screen, color, (x + size * 0.8, y + size * 0.1, size / 2, size / 4))
     ellipse(screen, color, (x + size, y, size / 2, size / 4))
     ellipse(screen, (0, 0, 0), (x + size * 1.3, y + size * 0.04, size / 10, size / 20))
