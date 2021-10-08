@@ -1,6 +1,17 @@
 import tkinter
 import random
 
+TIME = 20  # Whole time in seconds
+FPS = 60  # Frames per second
+N = 5  # Number of targets
+WIDTH = 500  # Window width in pixels
+HEIGHT = 500  # Window height in pixels
+V_MAX = 100  # Max velocity on one axis in pixels per second
+RADIUS = 20  # Target radius in pixels
+TYPES = ['Polygon', 'Ball']  # Types available for creating
+
+filename = 'leaderboard.txt'  # Leaderboard filename
+
 
 class Target:
     def __init__(self, canvas, tar_type, color, x, y, vx, vy, radius):
@@ -108,18 +119,7 @@ def end_work():
     print(name, score)
 
 
-TIME = 60  # Whole time in seconds
-FPS = 60  # Frames per second
-N = 10  # Number of targets
-WIDTH = 500  # Window width in pixels
-HEIGHT = 500  # Window height in pixels
-V_MAX = 100  # Max velocity on one axis in pixels per second
-RADIUS = 20  # Target radius in pixels
-TYPES = ['Polygon', 'Ball']  # Types available for creating
-
-filename = 'leaderboard.txt'  # Leaderboard filename
 score = 0
-
 root = tkinter.Tk()
 canvas = tkinter.Canvas(root, width=WIDTH, height=HEIGHT)
 canvas.pack()
