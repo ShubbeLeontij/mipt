@@ -56,8 +56,7 @@ class Target:
 
     def on_click(self, event=None):
         """
-        Function that add some points to score depending on target type and delete painting on canvas
-        and print current score.
+        Function that add some points to score depending on target type and delete painting on canvas.
         """
         global score
         if self.tar_type == 'ball':  # Adds 1 to score if ball
@@ -70,7 +69,7 @@ class Target:
 
         self.canvas.delete(self.painting)
         self.alive = False
-        print(score)
+        #print(score)
 
 
 def main_cycle(time_left):
@@ -114,7 +113,7 @@ FPS = 60  # Frames per second
 N = 10  # Number of targets
 WIDTH = 500  # Window width in pixels
 HEIGHT = 500  # Window height in pixels
-V_MAX = 100  # Max veloCacity on one axis in pixels per second
+V_MAX = 100  # Max velocity on one axis in pixels per second
 RADIUS = 20  # Target radius in pixels
 TYPES = ['Polygon', 'Ball']  # Types available for creating
 
