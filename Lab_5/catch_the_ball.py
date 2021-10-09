@@ -80,7 +80,7 @@ class Target:
 
         self.canvas.delete(self.painting)
         self.alive = False
-        #print(score)
+        # print(score)
 
 
 def main_cycle(time_left):
@@ -122,7 +122,7 @@ def end_work():
 score = 0
 root = tkinter.Tk()
 canvas = tkinter.Canvas(root, width=WIDTH, height=HEIGHT)
-canvas.pack()
+canvas.pack(fill=tkinter.BOTH, expand=1)
 
 targets = []
 main_cycle(TIME)
