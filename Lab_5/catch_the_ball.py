@@ -1,59 +1,152 @@
 import tkinter
 import random
 import json
+import time
 
-TIME = 10  # Whole time in seconds
-FPS = 60  # Frames per second
+TIME = 15  # Whole time in seconds
+FPS = 144  # Frames per second
 N = 5  # Number of targets
 WIDTH = 500  # Window width in pixels
 HEIGHT = 500  # Window height in pixels
 V_MAX = 100  # Max velocity on one axis in pixels per second
 RADIUS = 20  # Target radius in pixels
-TYPES = ['Polygon', 'Ball']  # Types available for creating
+TYPES = ['Triangle', 'Ball']  # Types available for creating
+FILENAME = 'leaderboard.json'  # Leaderboard filename
 
-filename = 'leaderboard.json'  # Leaderboard filename
+
+class GameMaster:
+    def __init__(self, duration, fps, n, width, height, v_max, radius, types, filename):
+        """
+        Starts new game
+        :param duration: game duration in seconds
+        :param fps: frames per second
+        :param n: number of targets
+        :param width: window width in pixels
+        :param height: window height in pixels
+        :param v_max: max velocity on one axis in pixels per second
+        :param radius: target radius in pixels
+        :param types: types available for creating
+        :param filename: leaderboard filename (.json)
+        """
+        self.duration = duration
+        self.fps = fps
+        self.n = n
+        self.width = width
+        self.height = height
+        self.v_max = v_max
+        self.radius = radius
+        self.types = types
+        self.filename = filename
+
+        self.root = tkinter.Tk()
+        self.root.title('Catch the ball')
+        self.canvas = tkinter.Canvas(self.root, width=self.width, height=self.height)
+        self.canvas.pack(fill=tkinter.BOTH, expand=1)
+
+        self.targets = []
+        self.score = 0
+        self.score_text = self.canvas.create_text(40, 40, text='Score: ' +
+                                                               str(self.score))
+        self.time_text = self.canvas.create_text(40, 20, text='Time: ' +
+                                                              str(round(self.duration, 1)))
+        self.init_time = time.time()
+
+        self.main_cycle()
+        self.root.mainloop()
+
+    def main_cycle(self):
+        """
+        Main cycle. Updates all targets and creates new one if necessary.
+        Calls itself after (1000 // FPS) ms delay.
+        """
+        start_time = time.time()
+        time_left = self.duration - (start_time - self.init_time)
+        self.canvas.itemconfig(self.score_text, text='Score: ' +
+                                                     str(self.score))
+        self.canvas.itemconfig(self.time_text, text='Time: ' +
+                                                    str(round(time_left, 1)))
+
+        for tar in self.targets:  # Update every target
+            if not tar.dead:
+                tar.update(1 / self.fps)
+            else:
+                self.score += tar.dead
+                self.targets.remove(tar)
+
+        if len(self.targets) < N:  # Add new target if there are less than N
+            self.targets.append(eval(random.choice(self.types) +
+                                     '(self.canvas, "#{:06x}".format(random.randint(0, 0xFFFFFF)),'
+                                     'random.randint(self.radius, self.width - self.radius),' 
+                                     'random.randint(self.radius, self.height - self.radius),'
+                                     'random.randint(0, self.v_max), random.randint(0, self.v_max),'
+                                     'self.radius)'))
+
+        end_time = time.time()
+        if time_left > 0:  # Call main cycle after delay
+            wait_time = (1 / self.fps) - (end_time - start_time)
+            self.root.after(int(1000 * wait_time) if wait_time > 0 else 1, self.main_cycle)
+
+        else:  # End main cycle
+            self.canvas.destroy()
+
+            self.name_label = tkinter.Label(self.root, text='Enter your name:')
+            self.name_label.pack()
+            self.name_entry = tkinter.Entry(self.root)
+            self.name_entry.pack()
+
+            self.root.bind('<Return>', lambda event: self.save_and_show())
+
+    def save_and_show(self):
+        """
+        Destroys objects, updates leaderboard json file and shows leaderboard table.
+        """
+        name = self.name_entry.get()
+        self.name_entry.destroy()
+        self.name_label.destroy()
+
+        with open(self.filename, 'r') as f:
+            loaded = json.load(f)
+        loaded['results'].append({'name': name, 'points': self.score})
+        with open(self.filename, 'w') as f:
+            json.dump(loaded, f, indent=4)
+
+        row = 0
+        tkinter.Label(self.root, text='Leaderboard').grid(row=row, column=0, columnspan=2)
+
+        for result in sorted(loaded['results'], key=lambda dic: dic['points'])[::-1]:
+            row += 1
+            tkinter.Label(self.root, text=result['name']).grid(row=row, column=0)
+            tkinter.Label(self.root, text=result['points']).grid(row=row, column=1)
 
 
 class Target:
-    def __init__(self, canvas, tar_type, color, x, y, vx, vy, radius):
+    def __init__(self, canvas, painting, x, y, vx, vy, radius, score_prize):
         """
         Creates Target Class object
         :param canvas: Tk.Canvas object where target should be painted
-        :param tar_type: type of target. Must be 'Ball' or 'Polygon'
-        :param color: target color in rgb hex format, for ex. '#ff0000' is red
+        :param painting: painting id from current canvas
         :param x: x center coordinate in pixels
         :param y: y center coordinate in pixels
         :param vx: velocity on axis x in pixels per second
         :param vy: velocity on axis y in pixels per second
-        :param radius: radius in pixels.
+        :param radius: some radius in pixels
+        :param score_prize: score prize when target is destroyed
         """
         self.dead = False
         self.canvas = canvas
-        self.tar_type = tar_type.lower()
+        self.painting = painting
         self.x = x
         self.y = y
         self.vx = vx
         self.vy = vy
         self.radius = radius
+        self.score_prize = score_prize
 
-        if self.tar_type == 'ball':
-            self.painting = self.canvas.create_oval(
-                x - radius, y - radius,
-                x + radius, y + radius, fill=color, outline='')
-
-        elif self.tar_type == 'polygon':
-            self.painting = self.canvas.create_polygon(
-                (x - radius, y - radius), (x + radius, y - radius),
-                (x, y + radius), fill=color, outline='')
-        else:
-            raise Exception('Incorrect target type')
-
-        self.canvas.tag_bind(self.painting, '<Button-1>', self.on_click)
+        self.canvas.tag_bind(self.painting, '<Button-1>', lambda event: self.on_click())
 
     def update(self, dt):
         """
-        Updates coordinates after dt time and moves painting
-        on canvas to actual coordinates.
+        Updates coordinates after dt time and moves painting on canvas to actual coordinates.
         Also checks collisions with canvas borders.
         :param dt: time after last update in seconds
         """
@@ -62,110 +155,65 @@ class Target:
         self.x += delta_x
         self.y += delta_y
 
-        if self.x < self.radius or \
-                self.x > self.canvas.winfo_width() - self.radius:
+        if self.x < self.radius or self.x > self.canvas.winfo_width() - self.radius:
             self.vx = - self.vx
-            if self.tar_type == 'polygon':
-                self.vy = self.vy * random.random() * 2
-
-        if self.y < self.radius or \
-                self.y > self.canvas.winfo_height() - self.radius:
+        if self.y < self.radius or self.y > self.canvas.winfo_height() - self.radius:
             self.vy = - self.vy
-            if self.tar_type == 'polygon':
-                self.vx = self.vx * random.random() * 2
 
         self.canvas.move(self.painting, delta_x, delta_y)
 
-    def on_click(self, event=None):
+    def on_click(self):
         """
-        Function that changes dead status depending on target type
-        and delete painting on canvas.
+        Function that changes dead status depending on target type and delete painting on canvas.
         """
-        if self.tar_type == 'ball':  # Adds 1 to score if ball
-            self.dead = 1
-        elif self.tar_type == 'polygon':  # Adds 2 to score if polygon
-            self.dead = 2
-        else:
-            self.dead = 1
-            print('Unexpected target type')
-
+        self.dead = self.score_prize
         self.canvas.delete(self.painting)
 
 
-def main_cycle(time_left, score):
-    """
-    Main cycle. Updates all targets and creates new one if necessary.
-    Calls itself after (1000 // FPS) ms delay.
-    :param time_left: time remaining until the end of work in seconds
-    :param score: current score
-    """
-    canvas.itemconfig(score_text, text=str(score))
-    for tar in targets:
-        if not tar.dead:
-            tar.update(1 / FPS)
-        else:
-            score += tar.dead
-            targets.remove(tar)
-
-    if len(targets) < N:
-        targets.append(Target(canvas, random.choice(TYPES),
-                              "#{:06x}".format(random.randint(0, 0xFFFFFF)),
-                              random.randint(RADIUS, WIDTH - RADIUS),
-                              random.randint(RADIUS, HEIGHT - RADIUS),
-                              random.randint(0, V_MAX),
-                              random.randint(0, V_MAX), RADIUS))
-
-    if time_left > 0:
-        time_left -= 1 / FPS
-        root.after(1000 // FPS, lambda: main_cycle(time_left, score))
-    else:
-        end_work(score)
+class Ball(Target):
+    def __init__(self, canvas, color, x, y, vx, vy, radius):
+        """
+        Creates Ball Class object
+        :param canvas: Tk.Canvas object where ball should be painted
+        :param color: ball color in rgb hex format, for ex. '#ff0000' is red
+        :param x: x center coordinate in pixels
+        :param y: y center coordinate in pixels
+        :param vx: velocity on axis x in pixels per second
+        :param vy: velocity on axis y in pixels per second
+        :param radius: radius in pixels
+        """
+        painting = canvas.create_oval(x - radius, y - radius, x + radius, y + radius,
+                                      fill=color, outline='')
+        super().__init__(canvas, painting, x, y, vx, vy, radius, 1)
 
 
-def end_work(score):
-    """
-    Destroys window and writes scoreline in leaderboard file (json format)
-    :param score: final score
-    """
-    canvas.destroy()
-    label = tkinter.Label(root, text='Enter your name:')
-    label.pack()
-    entry = tkinter.Entry(root)
-    entry.pack()
-    root.bind('<Return>', lambda event: save([entry, label], score))
+class Triangle(Target):
+    def __init__(self, canvas, color, x, y, vx, vy, radius):
+        """
+        Creates Triangle Class object
+        :param canvas: Tk.Canvas object where triangle should be painted
+        :param color: triangle color in rgb hex format, for ex. '#ff0000' is red
+        :param x: x center coordinate in pixels
+        :param y: y center coordinate in pixels
+        :param vx: velocity on axis x in pixels per second
+        :param vy: velocity on axis y in pixels per second
+        :param radius: half of side length in pixels
+        """
+        painting = canvas.create_polygon((x - radius, y - radius), (x + radius, y - radius),
+                                         (x, y + radius), fill=color, outline='')
+        super().__init__(canvas, painting, x, y, vx, vy, radius, 2)
+
+    def update(self, dt):
+        """
+        Updates coordinates after dt time and moves painting on canvas to actual coordinates.
+        Also checks collisions with canvas borders and randomize velocity if there is a collision.
+        :param dt: time after last update in seconds
+        """
+        super().update(dt)
+        if self.x < self.radius or self.x > self.canvas.winfo_width() - self.radius:
+            self.vy = self.vy * random.random() * random.choice([-2, 2])
+        if self.y < self.radius or self.y > self.canvas.winfo_height() - self.radius:
+            self.vx = self.vx * random.random() * random.choice([-2, 2])
 
 
-def save(objects, score):
-    name = objects[0].get()
-    for obj in objects:
-        obj.destroy()
-
-    with open(filename, 'r') as f:
-        loaded = json.load(f)
-
-    loaded['results'].append({'name': name, 'points': score})
-
-    with open(filename, 'w') as f:
-        json.dump(loaded, f, indent=4)
-
-    row = 0
-    top_label = tkinter.Label(root, text='Leaderboard')
-    top_label.grid(row=row, column=0)
-    for result in loaded['results']:
-        row += 1
-        name_label = tkinter.Label(root, text=result['name'])
-        name_label.grid(row=row, column=0)
-        score_label = tkinter.Label(root, text=result['points'])
-        score_label.grid(row=row, column=1)
-        
-
-
-root = tkinter.Tk()
-canvas = tkinter.Canvas(root, width=WIDTH, height=HEIGHT)
-canvas.pack(fill=tkinter.BOTH, expand=1)
-
-targets = []
-score_text = canvas.create_text(10, 10, text='0')
-main_cycle(TIME, 0)
-
-root.mainloop()
+GameMaster(TIME, FPS, N, WIDTH, HEIGHT, V_MAX, RADIUS, TYPES, FILENAME)
