@@ -9,10 +9,12 @@ HEIGHT = 500
 G = 0.5
 TIME_ACCELERATION = 15
 POWER = 7
+V_MAX = 5
+N = 3
 
 
 class GameMaster:
-    def __init__(self, fps, width, height, g, time_acceleration, power):
+    def __init__(self, fps, width, height, g, time_acceleration, power, v_max=0, n=1):
         """
         Starts new game
         :param fps: frames per second
@@ -21,6 +23,8 @@ class GameMaster:
         :param g: acceleration of gravity
         :param time_acceleration: time acceleration
         :param power: gun power
+        :param v_max: max velocity on one axis in pixels per second
+        :param n: number of targets
         """
         self.fps = fps
         self.width = width
@@ -28,6 +32,8 @@ class GameMaster:
         self.g = g
         self.time_acceleration = time_acceleration
         self.power = power
+        self.v_max = v_max
+        self.n = n
 
         self.result_text = None
         self.shells_text = None
@@ -59,21 +65,24 @@ class GameMaster:
                 gun.create_shell = []
 
         for target in self.targets:
+            target.move(dt)
+        for ball in self.shells:
+            ball.move(dt, self.g)
+
+        for target in self.targets:
             for ball in self.shells:
-                ball.move(dt, self.g)
                 if ball.hit_test(target) and target.alive:
                     target.alive = False
                     self.canvas.delete(target.painting)
-                    self.result_text = self.canvas.create_text(self.width / 2, self.height / 2,
-                                                               text='You destroyed targets in ' +
-                                                                    str(len(self.shells)) +
-                                                                    ' shots')
             if target.alive:
                 alive = True
 
         if alive:
             self.root.after(1000 // self.fps, self.main_cycle)
         else:
+            self.result_text = self.canvas.create_text(self.width / 2, self.height / 2,
+                                                       text='You destroyed targets in ' +
+                                                            str(len(self.shells)) + ' shots')
             self.root.after(5000, self.end_game)
 
     def start_game(self):
@@ -83,7 +92,9 @@ class GameMaster:
         self.shells_text = self.canvas.create_text(30, 30, text=len(self.shells))
         self.shells = []
         self.targets = [Ball(self.canvas, '#000000', random.randint(20, self.width - 20),
-                             random.randint(20, self.height - 20),  20)]
+                             random.randint(20, self.height - 20),  20,
+                             random.randint(0, self.v_max), random.randint(0, self.v_max))
+                        for i in range(self.n)]
         self.guns = [Gun(self.canvas, '#000000', 10, self.height - 10, self.power)]
 
         self.main_cycle()
@@ -101,7 +112,7 @@ class GameMaster:
 
 
 class Ball:
-    def __init__(self, canvas, color, x, y, radius):
+    def __init__(self, canvas, color, x, y, radius, vx, vy):
         """
         Creates Ball on Canvas.
         :param canvas: Canvas object
@@ -109,34 +120,22 @@ class Ball:
         :param x: x coordinate of center in pixels
         :param y: y coordinate of center in pixels
         :param radius: radius in pixels
+        :param vx: velocity on axis x in pixels per second
+        :param vy: velocity on axis y in pixels per second
         """
         self.canvas = canvas
+        self.color = color
         self.x = x
         self.y = y
         self.radius = radius
-        self.color = color
+        self.vx = vx
+        self.vy = vy
+
         self.alive = True
         self.painting = self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius,
                                                 fill=color)
 
-
-class Shell(Ball):
-    def __init__(self, canvas, color, x, y, radius, vx, vy):
-        """
-        Creates Shell object.
-        :param canvas: Canvas object
-        :param color: shell's color in rgb hex, for ex. '#ff0000' is red
-        :param x: x coordinate of center in pixels
-        :param y: y coordinate of center in pixels
-        :param radius: radius in pixels
-        :param vx: velocity on axis x in pixels per second
-        :param vy: velocity on axis y in pixels per second
-        """
-        super().__init__(canvas, color, x, y, radius)
-        self.vx = vx
-        self.vy = vy
-
-    def move(self, dt, g):
+    def move(self, dt, g=0):
         """
         Updates coordinates after dt time and moves painting on canvas
         to actual coordinates.
@@ -157,6 +156,21 @@ class Shell(Ball):
             self.vy = - self.vy
 
         self.canvas.move(self.painting, delta_x, delta_y)
+
+
+class Shell(Ball):
+    def __init__(self, canvas, color, x, y, radius, vx, vy):
+        """
+        Creates Shell object.
+        :param canvas: Canvas object
+        :param color: shell's color in rgb hex, for ex. '#ff0000' is red
+        :param x: x coordinate of center in pixels
+        :param y: y coordinate of center in pixels
+        :param radius: radius in pixels
+        :param vx: velocity on axis x in pixels per second
+        :param vy: velocity on axis y in pixels per second
+        """
+        super().__init__(canvas, color, x, y, radius, vx, vy)
 
     def hit_test(self, obj):
         """
@@ -251,10 +265,8 @@ class Gun:
             self.canvas.itemconfig(self.painting, fill=self.color)
 
 
-GameMaster(FPS, WIDTH, HEIGHT, G, TIME_ACCELERATION, POWER)
+GameMaster(FPS, WIDTH, HEIGHT, G, TIME_ACCELERATION, POWER, V_MAX, N)
 
-# TODO Улучшите программу из №1 добавив 2 цели.
-# TODO Улучшите программу из №2 сделав цели движущимися.
 # TODO Сделать несколько типов снарядов.
 # TODO Реализоваль несколько типов целей с различным характером движения.
 # TODO Сделать пушку двигающимся танком.
