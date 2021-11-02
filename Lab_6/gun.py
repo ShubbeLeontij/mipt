@@ -1,29 +1,136 @@
 import random
 import tkinter
 import math
-import time
+
+
+FPS = 144
+WIDTH = 1000
+HEIGHT = 500
+G = 0.5
+TIME_ACCELERATION = 15
+POWER = 7
+
+
+class GameMaster:
+    def __init__(self, fps, width, height, g, time_acceleration, power):
+        """
+        Starts new game
+        :param fps: frames per second
+        :param width: window width in pixels
+        :param height: window height in pixels
+        :param g: acceleration of gravity
+        :param time_acceleration: time acceleration
+        :param power: gun power
+        """
+        self.fps = fps
+        self.width = width
+        self.height = height
+        self.g = g
+        self.time_acceleration = time_acceleration
+        self.power = power
+
+        self.result_text = None
+        self.shells_text = None
+        self.shells = []
+        self.targets = []
+        self.guns = []
+
+        self.root = tkinter.Tk()
+        self.root.title('Gun')
+        self.canvas = tkinter.Canvas(self.root, height=self.height, width=self.width)
+        self.canvas.pack(fill=tkinter.BOTH, expand=1)
+
+        self.start_game()
+        self.root.mainloop()
+
+    def main_cycle(self):
+        """
+        Main cycle. Updates all shells and guns. Checks collisions with targets.
+        Calls itself after (1000 // FPS) ms delay if there are targets alive.
+        """
+        dt = self.time_acceleration / self.fps
+        alive = False
+
+        self.canvas.itemconfig(self.shells_text, text=len(self.shells))
+        for gun in self.guns:
+            gun.power_up(dt)
+            if len(gun.create_shell):
+                self.shells.append(Shell(self.canvas, *gun.create_shell))
+                gun.create_shell = []
+
+        for target in self.targets:
+            for ball in self.shells:
+                ball.move(dt, self.g)
+                if ball.hit_test(target) and target.alive:
+                    target.alive = False
+                    self.canvas.delete(target.painting)
+                    self.result_text = self.canvas.create_text(self.width / 2, self.height / 2,
+                                                               text='You destroyed targets in ' +
+                                                                    str(len(self.shells)) +
+                                                                    ' shots')
+            if target.alive:
+                alive = True
+
+        if alive:
+            self.root.after(1000 // self.fps, self.main_cycle)
+        else:
+            self.root.after(5000, self.end_game)
+
+    def start_game(self):
+        """
+        Starts new round. Creates guns and targets and calls main cycle
+        """
+        self.shells_text = self.canvas.create_text(30, 30, text=len(self.shells))
+        self.shells = []
+        self.targets = [Ball(self.canvas, '#000000', random.randint(20, self.width - 20),
+                             random.randint(20, self.height - 20),  20)]
+        self.guns = [Gun(self.canvas, '#000000', 10, self.height - 10, self.power)]
+
+        self.main_cycle()
+
+    def end_game(self):
+        """
+        Ends round. Destroys every entity in canvas and calls function that starts new round.
+        """
+        self.canvas.delete(self.result_text)
+        self.canvas.delete(self.shells_text)
+        for obj in self.shells + self.guns:
+            self.canvas.delete(obj.painting)
+
+        self.start_game()
 
 
 class Ball:
     def __init__(self, canvas, color, x, y, radius):
+        """
+        Creates Ball on Canvas.
+        :param canvas: Canvas object
+        :param color: ball's color in rgb hex, for ex. '#ff0000' is red
+        :param x: x coordinate of center in pixels
+        :param y: y coordinate of center in pixels
+        :param radius: radius in pixels
+        """
         self.canvas = canvas
         self.x = x
         self.y = y
         self.radius = radius
         self.color = color
-        self.live = True
-        self.id = self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius)
-        self.canvas.coords(self.id, x - radius, y - radius, x + radius, y + radius)
-        self.canvas.itemconfig(self.id, fill=color)
+        self.alive = True
+        self.painting = self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius,
+                                                fill=color)
 
 
 class Shell(Ball):
     def __init__(self, canvas, color, x, y, radius, vx, vy):
         """
-        Конструктор класса ball
-        Args:
-        x - начальное положение мяча по горизонтали
-        y - начальное положение мяча по вертикали
+        Creates Shell object.
+        :param canvas: Canvas object
+        :param color: shell's color in rgb hex, for ex. '#ff0000' is red
+        :param x: x coordinate of center in pixels
+        :param y: y coordinate of center in pixels
+        :param radius: radius in pixels
+        :param vx: velocity on axis x in pixels per second
+        :param vy: velocity on axis y in pixels per second
         """
         super().__init__(canvas, color, x, y, radius)
         self.vx = vx
@@ -31,7 +138,8 @@ class Shell(Ball):
 
     def move(self, dt, g):
         """
-        Updates coordinates after dt time and moves painting on canvas to actual coordinates.
+        Updates coordinates after dt time and moves painting on canvas
+        to actual coordinates.
         Also checks collisions with canvas borders.
         :param dt: time after last update in seconds
         :param g: acceleration of gravity
@@ -40,124 +148,111 @@ class Shell(Ball):
         delta_y = dt * self.vy + g * dt**2 / 2
         self.x += delta_x
         self.y += delta_y
+
         self.vy += dt * g
+
         if self.x < self.radius or self.x > self.canvas.winfo_width() - self.radius:
             self.vx = - self.vx
         if self.y < self.radius or self.y > self.canvas.winfo_height() - self.radius:
             self.vy = - self.vy
 
-        self.canvas.move(self.id, delta_x, delta_y)
+        self.canvas.move(self.painting, delta_x, delta_y)
 
     def hit_test(self, obj):
-        """Функция проверяет сталкивалкивается ли данный обьект с целью, описываемой в обьекте obj.
-
-        Args:
-            obj: Обьект, с которым проверяется столкновение.
-        Returns:
-            Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
         """
-        return True if (self.x - obj.x)**2 + (self.y - obj.y)**2 < (self.radius + obj.radius)**2 else False
+        Function that checks collision between current object and object given in argument.
+        :param obj: object to check for collision
+        :return: True if there is a collision and False if there is no
+        """
+        if (self.x - obj.x)**2 + (self.y - obj.y)**2 < (self.radius + obj.radius)**2:
+            return True
+        else:
+            return False
 
 
 class Gun:
-    def __init__(self, canvas, color, x, y, length=20, width=10):
+    def __init__(self, canvas, color, x, y, power, length=20, width=10):
+        """
+        Creates Gun object.
+        :param canvas: tkinter Canvas object
+        :param color: gun's color in rgb hex, for ex. '#ff0000' is red
+        :param x: x coordinate of center in pixels
+        :param y: y coordinate of center in pixels
+        :param power: projectile velocity coefficient from this gun
+        :param length: gun's length in pixels
+        :param width: gun's width in pixels
+        """
         self.canvas = canvas
         self.color = color
         self.x = x
         self.y = y
+        self.power = power
         self.length = length
         self.width = width
-        self.f2_power = 1
-        self.f2_on = False
-        self.an = 0
-        self.id = self.canvas.create_line(self.x, self.y, self.x + self.length * self.f2_power * math.cos(self.an),
-                                          self.y + self.length * self.f2_power * math.sin(self.an), width=self.width)
-        self.canvas.bind('<Button-1>', self.fire2_start)
-        self.canvas.bind('<ButtonRelease-1>', self.fire2_end)
+
+        self.charged = 1
+        self.charging = False
+        self.create_shell = []
+        self.angle = 0
+        self.painting = self.canvas.create_line(self.x, self.y, self.x + self.length, self.y,
+                                                width=self.width, fill=self.color)
+
+        self.canvas.bind('<Button-1>', self.charging_start)
+        self.canvas.bind('<ButtonRelease-1>', self.charging_end)
         self.canvas.bind('<Motion>', self.targeting)
 
-    def fire2_start(self, event):
-        self.f2_on = True
-
-    def fire2_end(self, event):
-        """Выстрел мячом.
-
-        Происходит при отпускании кнопки мыши.
-        Начальные значения компонент скорости мяча vx и vy зависят от положения мыши.
+    def charging_start(self, event=None):
         """
-        global balls, bullet
-        bullet += 1
-        self.an = math.atan((event.y - self.y) / (event.x - self.x))
-        vx = self.f2_power**2 * math.cos(self.an)
-        vy = self.f2_power**2 * math.sin(self.an)
-        balls += [Shell(self.canvas, '#ff0000', self.x, self.y, 5, vx, vy)]
-        self.f2_on = False
-        self.f2_power = 1
+        Changes gun's state to charging.
+        :param event: tkinter Event object
+        """
+        self.charging = True
+
+    def charging_end(self, event):
+        """
+        Saves the state of the gun for the subsequent creation of a shell and
+        resets charging state of the gun.
+        :param event: tkinter Event object
+        """
+        self.angle = math.atan((event.y - self.y) / (event.x - self.x))
+        vx = self.charged * self.power * math.cos(self.angle)
+        vy = self.charged * self.power * math.sin(self.angle)
+
+        self.create_shell = ['#FF0000', self.x, self.y, 5, vx, vy]
+        self.charging = False
+        self.charged = 1
         self.targeting()
 
     def targeting(self, event=None):
-        """Прицеливание. Зависит от положения мыши."""
+        """
+        Updates painting on Canvas so the gun looks directly at the mouse.
+        :param event: tkinter Event object
+        """
         if event and event.x != self.x:
-            self.an = math.atan((event.y - self.y) / (event.x - self.x))
-        if self.f2_on:
-            self.canvas.itemconfig(self.id, fill='orange')
+            self.angle = math.atan((event.y - self.y) / (event.x - self.x))
+
+        self.canvas.coords(self.painting, self.x, self.y,
+                           self.x + (math.cos(self.angle) * self.length * self.charged),
+                           self.y + (math.sin(self.angle) * self.length * self.charged))
+
+    def power_up(self, dt):
+        """
+        Increases gun's charging power and updates painting on Canvas.
+        :param dt: dt in seconds after last update
+        """
+        if self.charging:
+            if self.charged < 5:
+                self.charged += dt
+                self.canvas.coords(self.painting, self.x, self.y,
+                                   self.x + (math.cos(self.angle) * self.length * self.charged),
+                                   self.y + (math.sin(self.angle) * self.length * self.charged))
+            self.canvas.itemconfig(self.painting, fill='#FF7F00')
         else:
-            self.canvas.itemconfig(self.id, fill='black')
-        self.canvas.coords(self.id, self.x, self.y, self.x + math.cos(self.an) * self.length * self.f2_power,
-                           self.y + math.sin(self.an) * self.length * self.f2_power)
-
-    def power_up(self):
-        if self.f2_on:
-            if self.f2_power < 5:
-                self.f2_power += 0.1
-                self.canvas.coords(self.id, self.x, self.y, self.x + math.cos(self.an) * self.length * self.f2_power,
-                                   self.y + math.sin(self.an) * self.length * self.f2_power)
-            self.canvas.itemconfig(self.id, fill='orange')
-        else:
-            self.canvas.itemconfig(self.id, fill='black')
+            self.canvas.itemconfig(self.painting, fill=self.color)
 
 
-def new_game(event=''):
-    global screen1, balls, bullet
-    bullet = 0
-    balls = []
-    t1 = Ball(canvas, '#000000', random.randint(0, WIDTH), random.randint(0, HEIGHT), 20)
-    g1 = Gun(canvas, '#ff0000', 10, HEIGHT - 10)
-    id_points = canvas.create_text(30, 30, text=bullet, font='28')
-    while t1.live:
-        canvas.itemconfig(id_points, text=bullet)
-        for b in balls:
-            b.move(10 / FPS, 0.5)
-            if b.hit_test(t1) and t1.live:
-                t1.live = False
-                canvas.delete(id_points)
-                canvas.delete(t1.id)
-                canvas.itemconfig(screen1, text='Вы уничтожили цель за ' + str(bullet) + ' выстрелов')
-        canvas.update()
-        time.sleep(1 / FPS)
-        g1.power_up()
-    time.sleep(5)
-    canvas.itemconfig(screen1, text='')
-    canvas.delete(g1.id)
-    for ball in balls:
-        canvas.delete(ball.id)
-    new_game()
+GameMaster(FPS, WIDTH, HEIGHT, G, TIME_ACCELERATION, POWER)
 
-
-HEIGHT = 600
-WIDTH = 800
-FPS = 60
-
-root = tkinter.Tk()
-canvas = tkinter.Canvas(root, height=HEIGHT, width=WIDTH)
-canvas.pack(fill=tkinter.BOTH, expand=1)
-bullet = 0
-balls = []
-screen1 = canvas.create_text(400, 300, text='', font='28')
-
-new_game()
-
-root.mainloop()
 # TODO Улучшите программу из №1 добавив 2 цели.
 # TODO Улучшите программу из №2 сделав цели движущимися.
 # TODO Сделать несколько типов снарядов.
