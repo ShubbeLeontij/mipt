@@ -43,6 +43,9 @@ class GameMaster:
         self.canvas = tkinter.Canvas(self.root, width=self.width, height=self.height)
         self.canvas.pack(fill=tkinter.BOTH, expand=1)
 
+        self.name_label = None
+        self.name_entry = None
+        self.save_button = None
         self.targets = []
         self.score = 0
         self.score_text = self.canvas.create_text(40, 40, text='Score: ' +
@@ -67,7 +70,7 @@ class GameMaster:
                                                     str(round(time_left, 1)))
 
         for tar in self.targets:  # Update every target
-            if not tar.dead:
+            if tar.dead is False:
                 tar.update(1 / self.fps)
             else:
                 self.score += tar.dead
@@ -93,6 +96,8 @@ class GameMaster:
             self.name_label.pack()
             self.name_entry = tkinter.Entry(self.root)
             self.name_entry.pack()
+            self.save_button = tkinter.Button(self.root, command=self.save_and_show, text='Save')
+            self.save_button.pack()
 
             self.root.bind('<Return>', lambda event: self.save_and_show())
 
@@ -103,6 +108,7 @@ class GameMaster:
         name = self.name_entry.get()
         self.name_entry.destroy()
         self.name_label.destroy()
+        self.save_button.destroy()
 
         with open(self.filename, 'r') as f:
             loaded = json.load(f)
@@ -186,9 +192,11 @@ class Ball(Target):
                                       fill=color, outline='')
         super().__init__(canvas, painting, x, y, vx, vy, radius, 1)
 
+        self.color = color
+
 
 class Triangle(Target):
-    def __init__(self, canvas, color, x, y, vx, vy, radius):
+    def __init__(self, canvas, color, x, y, vx, vy, max_radius, lifetime=5):
         """
         Creates Triangle Class object
         :param canvas: Tk.Canvas object where triangle should be painted
@@ -197,23 +205,42 @@ class Triangle(Target):
         :param y: y center coordinate in pixels
         :param vx: velocity on axis x in pixels per second
         :param vy: velocity on axis y in pixels per second
-        :param radius: half of side length in pixels
+        :param max_radius: half of maximum side length in pixels
+        :param lifetime: time of triangle`s life in seconds
         """
-        painting = canvas.create_polygon((x - radius, y - radius), (x + radius, y - radius),
-                                         (x, y + radius), fill=color, outline='')
-        super().__init__(canvas, painting, x, y, vx, vy, radius, 2)
+        painting = canvas.create_polygon((x, y), (x, y), (x, y), fill=color, outline='')
+        super().__init__(canvas, painting, x, y, vx, vy, 0, 2)
+
+        self.color = color
+        self.max_radius = max_radius
+        self.growing_speed = 2 * self.max_radius / lifetime
 
     def update(self, dt):
         """
         Updates coordinates after dt time and moves painting on canvas to actual coordinates.
-        Also checks collisions with canvas borders and randomize velocity if there is a collision.
+        Checks collisions with canvas borders and randomize velocity if there is a collision and
+        changes current radius and kills triangle if radius < 0.
         :param dt: time after last update in seconds
         """
         super().update(dt)
+
         if self.x < self.radius or self.x > self.canvas.winfo_width() - self.radius:
             self.vy = self.vy * random.random() * random.choice([-2, 2])
         if self.y < self.radius or self.y > self.canvas.winfo_height() - self.radius:
             self.vx = self.vx * random.random() * random.choice([-2, 2])
+
+        self.radius += self.growing_speed * dt
+        if self.radius > self.max_radius:
+            self.growing_speed = -abs(self.growing_speed)
+        if self.radius < 0:
+            self.dead = 0
+
+        self.canvas.delete(self.painting)
+        self.painting = self.canvas.create_polygon((self.x - self.radius, self.y - self.radius),
+                                                   (self.x + self.radius, self.y - self.radius),
+                                                   (self.x, self.y + self.radius),
+                                                   fill=self.color, outline='')
+        self.canvas.tag_bind(self.painting, '<Button-1>', lambda event: self.on_click())
 
 
 GameMaster(TIME, FPS, N, WIDTH, HEIGHT, V_MAX, RADIUS, TYPES, FILENAME)
